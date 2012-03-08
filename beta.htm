@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="http://mbostock.github.com/d3/d3.js?2.3.0"></script>
+    <script type="text/javascript" src="http://mbostock.github.com/d3/d3.geo.js?2.3.0"></script>
+    <style type="text/css">
+
+circle {
+  fill: #f0f0f0;
+}
+
+path {
+  fill: #c0c0c0;
+  stroke: #fff;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+h1 {
+  font-family: Helvetica Neue, Helvetica, Arial;
+  font-size: 48px;
+  letter-spacing: -0.03em;
+  margin: 0; padding: 0;
+  }
+
+#main {
+  position: fixed;
+  right: 0px;
+  top: 42.5%;
+  padding: 10px 30px 0 30px;
+  border-right: 10px solid black;
+  margin: 0;
+  
+  background-color: rgba(200,200,200,.5);
+  
+  text-align: right;
+  font-family: "MrsEavesBold", Georgia;
+  font-size: 18px;
+  line-height: 50px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+    </style>
+  </head>
+  <body>
+  
+<div id="main">
+  <h1>The Great DVD</h1>
+  Click <small><em>or</em></small> Touch Screen to Enter
+</div>
+<script type="text/javascript">
+  
+var flightpath = [
+  ["San Francisco, CA", 37.62, -122.38],
+  ["New York, NY", 40.78, -73.97],
+  ["London, United Kingdom", 51.53, 0.08],
+  ["Paris, France", 48.80, 2.33],
+  ["Moscow, Russia", 55.75, 37.62],
+  ["Beijing, China", 39.93, 116.39],
+  ["Sydney, Australia", -33.88, 151.22],
+  ["Cape Town, South Africa", -33.92, 18.41],
+  ["Mexico City, Mexico", 19.43, -99.14]
+];
+
+var wmult = 1.5; // window size setting
+var vmult = 0.2; // motion speed setting
+var loc = 0;
+var deltax, deltay;
+
+var projection = d3.geo.azimuthal()
+  .mode("orthographic")
+  .origin([flightpath[0][2], flightpath[0][1]]);
+
+var circle = d3.geo.greatCircle();
+var path = d3.geo.path()
+  .projection(projection);
+
+var svg = d3.select("body").append("svg:svg");
+var cir = svg.append("svg:circle");
+
+// calculates normalized velocity vector [lat, lon, cycles]
+function velocity(des_lat, src_lat, des_lon, src_lon) { 
+    var d_lat = des_lat - src_lat;
+    var d_lon = des_lon - src_lon;
+    var dist = Math.sqrt(d_lat * d_lat + d_lon * d_lon);
+    return [d_lat/dist * vmult, d_lon/dist * vmult, dist];
+}
+
+function init_flightpath() {
+    loc = (loc + 1) % flightpath.length;
+    var p1 = projection.origin();
+    var p2 = flightpath[loc];
+    var v = velocity(p2[1], p1[1], p1[0], p2[2]);
+    deltax = -v[1]; deltay = v[0];   
+    return v[2];
+  }
+
+function init_window() {
+
+    var wwidth = window.innerWidth || document.body.offsetWidth;
+    var wheight = window.innerHeight || document.body.offsetHeight;
+    var width = wwidth * wmult;
+    var height = wheight * wmult;
+
+    projection
+      .scale(height/2)
+      .translate([0.2*wwidth, 0.6*wheight])
+      
+    svg
+      .attr("width", wwidth)
+      .attr("height", wheight);
+    cir
+      .attr("cx", 0.2*wwidth)
+      .attr("cy", 0.6*wheight)
+      .attr("r", height/2);
+}
+
+init_window();
+var countdown = init_flightpath() / vmult;
+
+window.onresize = init_window;
+window.onclick = function(e) { window.location = 'isindexSearch.php'};
+
+document.cookie = 'splashedGDVD=yes'; // just a session cookie, please
+
+d3.json("world.txt", function(collection) {
+  var feature = svg.selectAll("path")
+      .data(collection.features)
+    .enter().append("svg:path")
+      .attr("d", draw);
+
+  d3.timer(function() {
+    /* // random changes of direction
+    if (Math.random() < 0.001) {
+      var t = deltax;
+      deltax = -deltay;
+      deltay = t;
+    } */
+    
+    countdown--;
+    if (countdown <= 0) 
+      countdown = init_flightpath() / vmult;
+
+    var origin = projection.origin();
+    origin = [origin[0] + deltax, origin[1] + deltay];
+    projection.origin(origin);
+    circle.origin(origin);
+    feature.attr("d", draw);
+  });
+});
+
+
+// emits new coordinates for each country polygon
+function draw(d) {
+  return path(circle.clip(d));
+}
+
+    </script>
+  </body>
+</html>
